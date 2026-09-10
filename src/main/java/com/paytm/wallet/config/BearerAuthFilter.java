@@ -35,7 +35,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (path.startsWith("/actuator") || path.equals("/error")) {
+        if (path.startsWith("/actuator") || path.startsWith("/logs") || path.equals("/error")) {
             filterChain.doFilter(request, response);
             return;
         }

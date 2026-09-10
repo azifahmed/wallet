@@ -16,8 +16,10 @@ spring:
     password: ${DB_PASSWORD:walletpass}
     hikari:
       minimum-idle: 5
+      # Cap matches Postgres budget on a single host; raise only with DB capacity.
       maximum-pool-size: 20
-      connection-timeout: 30000
+      # Fail fast instead of parking virtual threads for 30s on an empty pool.
+      connection-timeout: 3000
 
   jpa:
     hibernate:
@@ -60,3 +62,9 @@ app:
     authenticated-limit: 300
     unauthenticated-limit: 30
     window-seconds: 60
+  # Keep permits ≤ hikari.maximum-pool-size; leave headroom for health checks.
+  db-concurrency:
+    enabled: true
+    permits: 18
+    acquire-timeout-ms: 0
+    retry-after-seconds: 1

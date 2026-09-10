@@ -1,5 +1,7 @@
 # Wallet Transfer — Quick Ops
 
+How APIs, services, SQL, transactions, and races work: [`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md).
+
 Default live base URL (change if yours differs):
 
 ```bash
@@ -88,7 +90,10 @@ bash burst.sh http://localhost:8080
 
 Structured JSON on stdout (`event=…`, `correlation_id=…`).
 
-- **Render:** Dashboard → your web service → **Logs** (watch while `burst.sh` runs).
+- **Public live tail (no Render login):** open
+  [`$BASE_URL/logs`](https://wallet-transfer-mleu.onrender.com/logs)
+  in a browser while `burst.sh` runs (SSE stream: `/logs/stream`).
+- **Render:** Dashboard → your web service → **Logs**.
 - **Local:** `docker compose logs -f app`
 
 Useful domain events: `wallet_credited`, `wallet_balance_cleared`, `wallet_deleted`,

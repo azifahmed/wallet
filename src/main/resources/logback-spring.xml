@@ -7,7 +7,9 @@
       <timeZone>UTC</timeZone>
     </encoder>
   </appender>
+  <appender name="LIVE_BUFFER" class="com.paytm.wallet.observability.LiveLogAppender"/>
   <root level="INFO">
     <appender-ref ref="JSON_STDOUT"/>
+    <appender-ref ref="LIVE_BUFFER"/>
   </root>
 </configuration>
