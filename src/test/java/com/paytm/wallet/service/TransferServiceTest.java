@@ -4,7 +4,6 @@ import com.paytm.wallet.domain.Transfer;
 import com.paytm.wallet.domain.Wallet;
 import com.paytm.wallet.exception.IdempotencyConflictException;
 import com.paytm.wallet.exception.InsufficientFundsException;
-import com.paytm.wallet.exception.WalletNotFoundException;
 import com.paytm.wallet.observability.DomainMetrics;
 import com.paytm.wallet.repository.TransferRepository;
 import com.paytm.wallet.repository.WalletRepository;
@@ -38,7 +37,11 @@ class TransferServiceTest {
         walletRepository = Mockito.mock(WalletRepository.class);
         transferRepository = Mockito.mock(TransferRepository.class);
         metrics = Mockito.mock(DomainMetrics.class);
-        transferService = new TransferService(walletRepository, transferRepository, metrics);
+        var transactionalWriter = new TransferTransactionalWriter(
+            walletRepository, transferRepository, metrics);
+        var idempotencyRecovery = new TransferIdempotencyRecovery(transferRepository, metrics);
+        transferService = new TransferService(
+            transactionalWriter, idempotencyRecovery, transferRepository);
     }
 
     @Test
@@ -49,14 +52,16 @@ class TransferServiceTest {
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
         when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
         Transfer savedTransfer = Transfer.completed(fromWalletId, toWalletId, 5000L, "key1");
-        when(transferRepository.save(any())).thenReturn(savedTransfer);
+        when(transferRepository.saveAndFlush(any())).thenReturn(savedTransfer);
 
         Transfer result = transferService.transfer(
             new TransferRequest(fromWalletId, toWalletId, 5000L, "key1"));
 
         assertThat(result.getStatus()).isEqualTo(Transfer.Status.COMPLETED);
         assertThat(result.getAmountPaise()).isEqualTo(5000L);
-        verify(metrics).incrementTransferCreated();
+        var callOrder = Mockito.inOrder(transferRepository, metrics);
+        callOrder.verify(transferRepository).saveAndFlush(any());
+        callOrder.verify(metrics).incrementTransferCreated();
     }
 
     @Test
@@ -97,13 +102,24 @@ class TransferServiceTest {
     }
 
     @Test
-    void transfer_withUnknownFromWallet_throwsWalletNotFound() {
-        when(transferRepository.findByIdempotencyKey("key5")).thenReturn(Optional.empty());
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.empty());
+    void transfer_whenConcurrentInsertLosesWithSameBody_recoversCommittedTransfer() {
+        Transfer committedTransfer = Transfer.completed(fromWalletId, toWalletId, 5000L, "key5");
+        when(transferRepository.findByIdempotencyKey("key5"))
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.of(committedTransfer));
+        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.newFor("u1")));
+        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.newFor("u2")));
+        when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
+        when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
+        when(transferRepository.saveAndFlush(any()))
+            .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"));
 
-        assertThatThrownBy(() -> transferService.transfer(
-            new TransferRequest(fromWalletId, toWalletId, 100L, "key5")))
-            .isInstanceOf(WalletNotFoundException.class);
+        Transfer result = transferService.transfer(
+            new TransferRequest(fromWalletId, toWalletId, 5000L, "key5"));
+
+        assertThat(result.getId()).isEqualTo(committedTransfer.getId());
+        verify(metrics).incrementIdempotentReplay();
+        verify(metrics, never()).incrementTransferCreated();
     }
 
     @Test
