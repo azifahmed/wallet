@@ -63,4 +63,28 @@ class WalletServiceTest {
             .isInstanceOf(WalletNotFoundException.class)
             .hasMessageContaining(walletId.toString());
     }
+
+    @Test
+    void credit_withExistingWallet_addsAmountAndReturnsUpdatedWallet() {
+        Wallet wallet = Wallet.create("user1");
+        when(walletRepository.findById(wallet.getId()))
+            .thenReturn(Optional.of(wallet))
+            .thenReturn(Optional.of(wallet));
+        when(walletRepository.credit(wallet.getId(), 1000000L)).thenReturn(1);
+
+        Wallet result = walletService.credit(wallet.getId(), 1000000L);
+
+        assertThat(result.getId()).isEqualTo(wallet.getId());
+        verify(walletRepository).credit(wallet.getId(), 1000000L);
+    }
+
+    @Test
+    void credit_whenWalletMissing_throwsWalletNotFoundException() {
+        UUID walletId = UUID.randomUUID();
+        when(walletRepository.findById(walletId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> walletService.credit(walletId, 500L))
+            .isInstanceOf(WalletNotFoundException.class);
+        verify(walletRepository, never()).credit(any(), anyLong());
+    }
 }

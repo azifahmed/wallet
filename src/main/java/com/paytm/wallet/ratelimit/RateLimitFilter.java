@@ -33,7 +33,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String path = request.getRequestURI();
-        if (path.startsWith("/actuator")) {
+        if (path.startsWith("/actuator") || path.equals("/error")) {
             filterChain.doFilter(request, response);
             return;
         }

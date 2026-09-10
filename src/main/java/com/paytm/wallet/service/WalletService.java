@@ -34,4 +34,21 @@ public class WalletService {
         return walletRepository.findById(walletId)
             .orElseThrow(() -> new WalletNotFoundException(walletId.toString()));
     }
+
+    /**
+     * Admin mint/load — adds paise to a wallet. This is outside P2P conservation
+     * (like Paytm Add Money); only {@code POST /transfers} must conserve.
+     */
+    @Transactional
+    public Wallet credit(UUID walletId, long amountPaise) {
+        getById(walletId);
+        int rowsAffected = walletRepository.credit(walletId, amountPaise);
+        if (rowsAffected == 0) {
+            throw new WalletNotFoundException(walletId.toString());
+        }
+        Wallet updatedWallet = getById(walletId);
+        log.info("event=wallet_credited wallet_id={} amount_paise={} balance_paise={}",
+            walletId, amountPaise, updatedWallet.getBalance());
+        return updatedWallet;
+    }
 }

@@ -164,6 +164,48 @@ class WebLayerTest {
     }
 
     @Test
+    void credit_withAdminUser_returnsUpdatedWallet() throws Exception {
+        Wallet wallet = Wallet.create("user-1");
+        when(walletService.credit(wallet.getId(), 1000000L)).thenReturn(wallet);
+
+        mockMvc.perform(post("/wallets/{id}/credit", wallet.getId())
+                .requestAttr("userId", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount_paise\":1000000}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.walletId").value(wallet.getId().toString()))
+            .andExpect(jsonPath("$.userId").value("user-1"));
+
+        verify(walletService).credit(wallet.getId(), 1000000L);
+    }
+
+    @Test
+    void credit_withNonAdminUser_returnsForbidden() throws Exception {
+        UUID walletId = UUID.randomUUID();
+
+        mockMvc.perform(post("/wallets/{id}/credit", walletId)
+                .requestAttr("userId", "user-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount_paise\":1000000}"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+    }
+
+    @Test
+    void credit_whenWalletMissing_returnsNotFound() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        when(walletService.credit(walletId, 500L))
+            .thenThrow(new WalletNotFoundException(walletId.toString()));
+
+        mockMvc.perform(post("/wallets/{id}/credit", walletId)
+                .requestAttr("userId", "admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount_paise\":500}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
     void endpoint_whenUnexpectedExceptionOccurs_returnsSanitizedInternalError() throws Exception {
         UUID walletId = UUID.randomUUID();
         when(walletService.getById(walletId)).thenThrow(new RuntimeException("database password leaked"));

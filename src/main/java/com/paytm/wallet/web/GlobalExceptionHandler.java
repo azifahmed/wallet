@@ -1,5 +1,6 @@
 package com.paytm.wallet.web;
 
+import com.paytm.wallet.exception.ForbiddenException;
 import com.paytm.wallet.exception.IdempotencyConflictException;
 import com.paytm.wallet.exception.InsufficientFundsException;
 import com.paytm.wallet.exception.TransferNotFoundException;
@@ -30,6 +31,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFound(RuntimeException exception) {
         return new ErrorResponse("NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleForbidden(ForbiddenException exception) {
+        log.warn("event=request_forbidden message={}", exception.getMessage());
+        return new ErrorResponse("FORBIDDEN", exception.getMessage());
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)

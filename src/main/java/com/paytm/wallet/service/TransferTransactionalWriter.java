@@ -40,6 +40,11 @@ public class TransferTransactionalWriter {
         walletRepository.findById(request.toWalletId())
             .orElseThrow(() -> new WalletNotFoundException(request.toWalletId().toString()));
 
+        // Future: validate external account / KYC for from/to before ledger move.
+        // if (!accountDirectory.isTransferAllowed(request.fromWalletId(), request.toWalletId())) {
+        //     throw new InvalidTransferPartyException(request.fromWalletId(), request.toWalletId());
+        // }
+
         int rowsAffected = walletRepository.conditionalDebit(
             request.fromWalletId(), request.amountPaise());
         if (rowsAffected == 0) {

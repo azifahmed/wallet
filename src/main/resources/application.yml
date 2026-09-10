@@ -1,5 +1,9 @@
 server:
   port: 8080
+  error:
+    whitelabel:
+      enabled: false
+    include-message: always
 
 spring:
   threads:
@@ -50,6 +54,7 @@ app:
       user3: "token-user3"
       user4: "token-user4"
       user5: "token-user5"
+      admin: "token-admin"
   rate-limit:
     enabled: true
     authenticated-limit: 300

@@ -8,7 +8,7 @@
 # Deployment (Dockerfile / compose / host) is a separate concern.
 # ============================================================
 set -euo pipefail
-BASE_URL="${1:-http://localhost:8080}"
+BASE_URL="${1:-https://wallet-transfer-mleu.onrender.com}"
 # Strip trailing slash so paths join cleanly
 BASE_URL="${BASE_URL%/}"
 PASS=0; FAIL=0
@@ -25,18 +25,27 @@ echo "--- Bootstrap ---"
 W1=$(curl -sf -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user1" | jq -r '.walletId')
 W2=$(curl -sf -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user2" | jq -r '.walletId')
 echo "W1=$W1  W2=$W2"
+
+# Mint/load for TEST 2/3 (admin credit — outside P2P conservation, like Add Money)
+SEED_PAISE=1000000
 echo ""
-echo "Fund W1 and W2 to ~1000000 paise BEFORE running TEST 2/3 (one-time SQL):"
-echo "  Local:  docker compose exec postgres psql -U walletuser -d walletdb -c \\"
-echo "          \"UPDATE wallets SET balance=1000000 WHERE id IN ('$W1','$W2');\""
-echo "  Remote: use your host's Postgres shell (Render DB → Connect) with the same SQL,"
-echo "          then re-run: bash burst.sh $BASE_URL"
+echo "--- Seed (admin credit ${SEED_PAISE} paise each) ---"
+curl -sf -X POST "$BASE_URL/wallets/$W1/credit" \
+  -H "Authorization: Bearer token-admin" \
+  -H "Content-Type: application/json" \
+  -d "{\"amount_paise\":${SEED_PAISE}}" | jq -c '{walletId,balance}'
+curl -sf -X POST "$BASE_URL/wallets/$W2/credit" \
+  -H "Authorization: Bearer token-admin" \
+  -H "Content-Type: application/json" \
+  -d "{\"amount_paise\":${SEED_PAISE}}" | jq -c '{walletId,balance}'
+ok "Seeded W1 and W2 via admin credit"
 
 echo ""
 echo "--- TEST 1: 50 concurrent POST /wallets for same user ---"
 WALLET_IDS=$(seq 1 50 | xargs -P50 -I{} \
-  curl -sf -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user5" 2>/dev/null \
-  | jq -r '.walletId' | sort -u | wc -l | tr -d ' ')
+  curl -s -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user5" 2>/dev/null \
+  | jq -r '.walletId // empty' 2>/dev/null | sort -u | wc -l | tr -d ' ' || true)
+WALLET_IDS=${WALLET_IDS:-0}
 if [ "$WALLET_IDS" -eq 1 ]; then
   ok "TEST 1: Exactly 1 wallet ID across 50 concurrent creates"
 else
@@ -50,7 +59,7 @@ FUND_W2=$(curl -sf "$BASE_URL/wallets/$W2" -H "Authorization: Bearer token-user2
 echo "Current balances: W1=$FUND_W1  W2=$FUND_W2"
 MIN_FUND=50000
 if [ "${FUND_W1:-0}" -lt "$MIN_FUND" ] || [ "${FUND_W2:-0}" -lt "$MIN_FUND" ]; then
-  fail "Wallets underfunded for TEST 2/3 (need ≥ ${MIN_FUND} paise each). Apply the SQL above, then re-run."
+  fail "Wallets underfunded for TEST 2/3 (need ≥ ${MIN_FUND} paise each after admin credit)."
   echo ""
   echo "==============================="
   echo " Results: ${PASS} passed, ${FAIL} failed"
