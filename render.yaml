@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: wallet-transfer
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: wallet-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: wallet-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: wallet-postgres
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: wallet-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: wallet-postgres
+          property: password
+
+databases:
+  - name: wallet-postgres
+    plan: free
+    databaseName: walletdb
+    user: walletuser
