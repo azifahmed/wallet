@@ -76,8 +76,8 @@ fi
 echo ""
 echo "--- Checking /actuator/prometheus domain counters ---"
 METRICS=$(curl -sf "$BASE_URL/actuator/prometheus" 2>/dev/null || echo "")
-for COUNTER in transfers_total transfers_declined_insufficient_funds_total \
-               transfers_idempotent_replay_total wallets_total; do
+for COUNTER in transfers_created_total transfers_declined_insufficient_funds_total \
+               transfers_idempotent_replay_total wallets_created_total; do
   if echo "$METRICS" | grep -q "$COUNTER"; then
     ok "Metric $COUNTER present"
   else

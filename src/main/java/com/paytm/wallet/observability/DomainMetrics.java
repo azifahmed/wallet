@@ -13,13 +13,13 @@ public class DomainMetrics {
     private final Counter walletsCreated;
 
     public DomainMetrics(MeterRegistry registry) {
-        this.transfersCreated = Counter.builder("transfers_created_total")
+        this.transfersCreated = Counter.builder("transfers_created")
             .description("Transfers successfully completed").register(registry);
-        this.transfersDeclined = Counter.builder("transfers_declined_insufficient_funds_total")
+        this.transfersDeclined = Counter.builder("transfers_declined_insufficient_funds")
             .description("Transfers declined — insufficient funds").register(registry);
-        this.transfersIdempotentReplay = Counter.builder("transfers_idempotent_replay_total")
+        this.transfersIdempotentReplay = Counter.builder("transfers_idempotent_replay")
             .description("Idempotent transfer replays served").register(registry);
-        this.walletsCreated = Counter.builder("wallets_created_total")
+        this.walletsCreated = Counter.builder("wallets_created")
             .description("Wallets created (not replayed)").register(registry);
     }
 
