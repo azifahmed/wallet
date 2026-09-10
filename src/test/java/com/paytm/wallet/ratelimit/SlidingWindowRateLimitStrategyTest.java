@@ -43,4 +43,18 @@ class SlidingWindowRateLimitStrategyTest {
         Thread.sleep(60L);
         assertThat(strategy.tryAcquire("user:expire", 1, 50L)).isTrue();
     }
+
+    @Test
+    void tryAcquire_afterWindowElapses_doesNotLeaveEmptyDequeInMap() throws InterruptedException {
+        assertThat(strategy.tryAcquire("user:cleanup", 1, 50L)).isTrue();
+        Thread.sleep(60L);
+        assertThat(strategy.tryAcquire("user:cleanup", 1, 50L)).isTrue();
+        assertThat(strategy.hasEmptyTrackedDeque()).isFalse();
+    }
+
+    @Test
+    void tryAcquire_withZeroLimit_doesNotLeaveEmptyKeyInMap() {
+        assertThat(strategy.tryAcquire("user:zero", 0, 60_000L)).isFalse();
+        assertThat(strategy.isKeyTracked("user:zero")).isFalse();
+    }
 }

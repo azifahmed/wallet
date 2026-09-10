@@ -22,11 +22,30 @@ public class SlidingWindowRateLimitStrategy implements RateLimitStrategy {
             while (!timestamps.isEmpty() && timestamps.peekFirst() <= nowMillis - windowMillis) {
                 timestamps.removeFirst();
             }
+            if (timestamps.isEmpty()) {
+                requestTimestampsByKey.remove(key, timestamps);
+            }
             if (timestamps.size() >= limit) {
                 return false;
             }
             timestamps.addLast(nowMillis);
+            requestTimestampsByKey.putIfAbsent(key, timestamps);
             return true;
         }
+    }
+
+    boolean isKeyTracked(String key) {
+        return requestTimestampsByKey.containsKey(key);
+    }
+
+    boolean hasEmptyTrackedDeque() {
+        for (Deque<Long> timestamps : requestTimestampsByKey.values()) {
+            synchronized (timestamps) {
+                if (timestamps.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
