@@ -1,5 +1,6 @@
 package com.paytm.wallet.concurrency;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Semaphore;
@@ -15,6 +16,7 @@ public class DbConcurrencyGate {
     private final Semaphore semaphore;
     private final long acquireTimeoutMs;
 
+    @Autowired
     public DbConcurrencyGate(DbConcurrencyProperties properties) {
         this(properties.getPermits(), properties.getAcquireTimeoutMs());
     }
