@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,10 +37,7 @@ public class TransferTransactionalWriter {
             throw new IdempotencyConflictException(existingTransfer);
         }
 
-        walletRepository.findById(request.fromWalletId())
-            .orElseThrow(() -> new WalletNotFoundException(request.fromWalletId().toString()));
-        walletRepository.findById(request.toWalletId())
-            .orElseThrow(() -> new WalletNotFoundException(request.toWalletId().toString()));
+        lockWalletsInOrder(request.fromWalletId(), request.toWalletId());
 
         // Future: validate external account / KYC for from/to before ledger move.
         // if (!accountDirectory.isTransferAllowed(request.fromWalletId(), request.toWalletId())) {
@@ -72,6 +71,17 @@ public class TransferTransactionalWriter {
             request.amountPaise());
         metrics.incrementTransferCreated();
         return savedTransfer;
+    }
+
+    private void lockWalletsInOrder(UUID fromWalletId, UUID toWalletId) {
+        UUID firstId = fromWalletId.compareTo(toWalletId) < 0 ? fromWalletId : toWalletId;
+        UUID secondId = firstId.equals(fromWalletId) ? toWalletId : fromWalletId;
+        var lockedWallets = walletRepository.lockPairForUpdate(firstId, secondId);
+        if (lockedWallets.size() < 2) {
+            boolean fromMissing = lockedWallets.stream().noneMatch(w -> w.getId().equals(fromWalletId));
+            UUID missingId = fromMissing ? fromWalletId : toWalletId;
+            throw new WalletNotFoundException(missingId.toString());
+        }
     }
 
     private boolean isSameBody(Transfer existingTransfer, TransferRequest request) {

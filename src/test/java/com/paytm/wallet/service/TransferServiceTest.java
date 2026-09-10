@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,8 +48,7 @@ class TransferServiceTest {
 
     @Test
     void transfer_withSufficientFunds_completesAndReturnsTransfer() {
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
+        stubLockPair(fromWalletId, toWalletId);
         when(transferRepository.findByIdempotencyKey("key1")).thenReturn(Optional.empty());
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
         when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
@@ -65,9 +66,28 @@ class TransferServiceTest {
     }
 
     @Test
+    void transfer_locksWalletsInAscendingUuidOrder_beforeDebitAndCredit() {
+        UUID smallerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID largerId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        when(transferRepository.findByIdempotencyKey("key-order")).thenReturn(Optional.empty());
+        when(walletRepository.lockPairForUpdate(smallerId, largerId))
+            .thenReturn(List.of(Wallet.create("u1"), Wallet.create("u2")));
+        when(walletRepository.conditionalDebit(largerId, 100L)).thenReturn(1);
+        when(walletRepository.credit(smallerId, 100L)).thenReturn(1);
+        Transfer savedTransfer = Transfer.completed(largerId, smallerId, 100L, "key-order");
+        when(transferRepository.saveAndFlush(any())).thenReturn(savedTransfer);
+
+        transferService.transfer(new TransferRequest(largerId, smallerId, 100L, "key-order"));
+
+        var callOrder = inOrder(walletRepository);
+        callOrder.verify(walletRepository).lockPairForUpdate(smallerId, largerId);
+        callOrder.verify(walletRepository).conditionalDebit(largerId, 100L);
+        callOrder.verify(walletRepository).credit(smallerId, 100L);
+    }
+
+    @Test
     void transfer_whenConditionalDebitReturnsZero_throwsInsufficientFunds() {
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
+        stubLockPair(fromWalletId, toWalletId);
         when(transferRepository.findByIdempotencyKey("key2")).thenReturn(Optional.empty());
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(0);
 
@@ -107,8 +127,7 @@ class TransferServiceTest {
         when(transferRepository.findByIdempotencyKey("key5"))
             .thenReturn(Optional.empty())
             .thenReturn(Optional.of(committedTransfer));
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
+        stubLockPair(fromWalletId, toWalletId);
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
         when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
         when(transferRepository.saveAndFlush(any()))
@@ -128,5 +147,12 @@ class TransferServiceTest {
             new TransferRequest(fromWalletId, fromWalletId, 100L, "key-same")))
             .isInstanceOf(IllegalArgumentException.class);
         verify(walletRepository, never()).conditionalDebit(any(), anyLong());
+    }
+
+    private void stubLockPair(UUID walletIdA, UUID walletIdB) {
+        UUID firstId = walletIdA.compareTo(walletIdB) < 0 ? walletIdA : walletIdB;
+        UUID secondId = firstId.equals(walletIdA) ? walletIdB : walletIdA;
+        when(walletRepository.lockPairForUpdate(firstId, secondId))
+            .thenReturn(List.of(Wallet.create("u1"), Wallet.create("u2")));
     }
 }

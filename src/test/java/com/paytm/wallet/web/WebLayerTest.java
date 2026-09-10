@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -203,6 +205,54 @@ class WebLayerTest {
                 .content("{\"amount_paise\":500}"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    void clear_withAdminUser_returnsZeroedWallet() throws Exception {
+        Wallet wallet = Wallet.create("user-1");
+        when(walletService.clear(wallet.getId())).thenReturn(wallet);
+
+        mockMvc.perform(post("/wallets/{id}/clear", wallet.getId())
+                .requestAttr("userId", "admin"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.walletId").value(wallet.getId().toString()));
+
+        verify(walletService).clear(wallet.getId());
+    }
+
+    @Test
+    void clear_withNonAdminUser_returnsForbidden() throws Exception {
+        UUID walletId = UUID.randomUUID();
+
+        mockMvc.perform(post("/wallets/{id}/clear", walletId)
+                .requestAttr("userId", "user-1"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+
+        verify(walletService, never()).clear(walletId);
+    }
+
+    @Test
+    void delete_withAdminUser_returnsNoContent() throws Exception {
+        UUID walletId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/wallets/{id}", walletId)
+                .requestAttr("userId", "admin"))
+            .andExpect(status().isNoContent());
+
+        verify(walletService).delete(walletId);
+    }
+
+    @Test
+    void delete_withNonAdminUser_returnsForbidden() throws Exception {
+        UUID walletId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/wallets/{id}", walletId)
+                .requestAttr("userId", "user-1"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+
+        verify(walletService, never()).delete(walletId);
     }
 
     @Test

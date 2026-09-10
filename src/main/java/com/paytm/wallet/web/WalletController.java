@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,11 +49,29 @@ public class WalletController {
             @PathVariable UUID id,
             @Valid @RequestBody CreditWalletRequest request,
             HttpServletRequest httpRequest) {
-        String userId = (String) httpRequest.getAttribute("userId");
-        if (!ADMIN_USER_ID.equals(userId)) {
-            throw new ForbiddenException("Admin token required to credit wallets");
-        }
+        requireAdmin(httpRequest);
         var wallet = walletService.credit(id, request.amount_paise());
         return new CreateWalletResponse(wallet.getId(), wallet.getUserId(), wallet.getBalance());
+    }
+
+    @PostMapping("/{id}/clear")
+    public CreateWalletResponse clear(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        requireAdmin(httpRequest);
+        var wallet = walletService.clear(id);
+        return new CreateWalletResponse(wallet.getId(), wallet.getUserId(), wallet.getBalance());
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        requireAdmin(httpRequest);
+        walletService.delete(id);
+    }
+
+    private void requireAdmin(HttpServletRequest httpRequest) {
+        String userId = (String) httpRequest.getAttribute("userId");
+        if (!ADMIN_USER_ID.equals(userId)) {
+            throw new ForbiddenException("Admin token required for this operation");
+        }
     }
 }

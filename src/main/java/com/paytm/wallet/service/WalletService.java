@@ -2,6 +2,7 @@ package com.paytm.wallet.service;
 
 import com.paytm.wallet.domain.Wallet;
 import com.paytm.wallet.exception.WalletNotFoundException;
+import com.paytm.wallet.repository.TransferRepository;
 import com.paytm.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class WalletService {
 
     private final WalletRepository walletRepository;
+    private final TransferRepository transferRepository;
     private final WalletInsertService walletInsertService;
 
     @Transactional
@@ -38,6 +40,7 @@ public class WalletService {
     /**
      * Admin mint/load — adds paise to a wallet. This is outside P2P conservation
      * (like Paytm Add Money); only {@code POST /transfers} must conserve.
+     * Dev/demo helper — not a production money API.
      */
     @Transactional
     public Wallet credit(UUID walletId, long amountPaise) {
@@ -50,5 +53,34 @@ public class WalletService {
         log.info("event=wallet_credited wallet_id={} amount_paise={} balance_paise={}",
             walletId, amountPaise, updatedWallet.getBalance());
         return updatedWallet;
+    }
+
+    /**
+     * Admin clear — sets balance to 0. Dev/demo helper only.
+     */
+    @Transactional
+    public Wallet clear(UUID walletId) {
+        getById(walletId);
+        int rowsAffected = walletRepository.clearBalance(walletId);
+        if (rowsAffected == 0) {
+            throw new WalletNotFoundException(walletId.toString());
+        }
+        Wallet updatedWallet = getById(walletId);
+        log.info("event=wallet_balance_cleared wallet_id={} balance_paise={}",
+            walletId, updatedWallet.getBalance());
+        return updatedWallet;
+    }
+
+    /**
+     * Admin delete — removes related transfers then the wallet so get-or-create
+     * can run again. Dev/demo helper only; destructive.
+     */
+    @Transactional
+    public void delete(UUID walletId) {
+        getById(walletId);
+        int transfersRemoved = transferRepository.deleteAllByWalletId(walletId);
+        walletRepository.deleteById(walletId);
+        log.info("event=wallet_deleted wallet_id={} transfers_removed={}",
+            walletId, transfersRemoved);
     }
 }
