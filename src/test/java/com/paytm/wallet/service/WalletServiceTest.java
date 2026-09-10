@@ -2,7 +2,6 @@ package com.paytm.wallet.service;
 
 import com.paytm.wallet.domain.Wallet;
 import com.paytm.wallet.exception.WalletNotFoundException;
-import com.paytm.wallet.observability.DomainMetrics;
 import com.paytm.wallet.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,39 +18,40 @@ import static org.mockito.Mockito.*;
 class WalletServiceTest {
 
     WalletRepository walletRepository;
-    DomainMetrics metrics;
+    WalletInsertService walletInsertService;
     WalletService walletService;
 
     @BeforeEach
     void setUp() {
         walletRepository = Mockito.mock(WalletRepository.class);
-        metrics = Mockito.mock(DomainMetrics.class);
-        walletService = new WalletService(walletRepository, metrics);
+        walletInsertService = Mockito.mock(WalletInsertService.class);
+        walletService = new WalletService(walletRepository, walletInsertService);
     }
 
     @Test
     void getOrCreate_whenUserHasNone_createsNewWallet() {
         Wallet savedWallet = Wallet.newFor("user1");
-        when(walletRepository.save(any())).thenReturn(savedWallet);
-        when(walletRepository.findByUserId("user1")).thenReturn(Optional.of(savedWallet));
+        when(walletInsertService.insertWallet("user1")).thenReturn(savedWallet);
 
         Wallet result = walletService.getOrCreate("user1");
 
         assertThat(result.getUserId()).isEqualTo("user1");
         assertThat(result.getBalance()).isEqualTo(0L);
-        verify(metrics).incrementWalletCreated();
+        verify(walletInsertService).insertWallet("user1");
+        verify(walletRepository, never()).findByUserId(anyString());
     }
 
     @Test
     void getOrCreate_whenDuplicateKeyOnSave_returnsExistingWallet() {
         Wallet existingWallet = Wallet.newFor("user1");
-        when(walletRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+        when(walletInsertService.insertWallet("user1"))
+            .thenThrow(new DataIntegrityViolationException("duplicate key"));
         when(walletRepository.findByUserId("user1")).thenReturn(Optional.of(existingWallet));
 
         Wallet result = walletService.getOrCreate("user1");
 
         assertThat(result.getId()).isEqualTo(existingWallet.getId());
-        verify(metrics, never()).incrementWalletCreated();
+        verify(walletRepository).findByUserId("user1");
     }
 
     @Test
