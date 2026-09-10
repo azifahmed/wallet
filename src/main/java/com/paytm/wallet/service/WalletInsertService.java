@@ -19,7 +19,7 @@ public class WalletInsertService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Wallet insertWallet(String userId) {
-        Wallet savedWallet = walletRepository.saveAndFlush(Wallet.newFor(userId));
+        Wallet savedWallet = walletRepository.saveAndFlush(Wallet.create(userId));
         log.info("event=wallet_created wallet_id={} user_id={}", savedWallet.getId(), userId);
         metrics.incrementWalletCreated();
         return savedWallet;

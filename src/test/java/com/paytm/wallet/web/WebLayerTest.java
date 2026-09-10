@@ -46,7 +46,7 @@ class WebLayerTest {
 
     @Test
     void createOrGet_withAuthenticatedUser_returnsCreatedWallet() throws Exception {
-        Wallet wallet = Wallet.newFor("user-1");
+        Wallet wallet = Wallet.create("user-1");
         when(walletService.getOrCreate("user-1")).thenReturn(wallet);
 
         mockMvc.perform(post("/wallets").requestAttr("userId", "user-1"))
@@ -84,7 +84,7 @@ class WebLayerTest {
 
     @Test
     void getById_withExistingResources_returnsMappedResponses() throws Exception {
-        Wallet wallet = Wallet.newFor("user-1");
+        Wallet wallet = Wallet.create("user-1");
         Transfer transfer = Transfer.completed(
             wallet.getId(), UUID.randomUUID(), 500L, "key-1");
         when(walletService.getById(wallet.getId())).thenReturn(wallet);

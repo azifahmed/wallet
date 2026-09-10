@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.*;
 class WalletTest {
 
     @Test
-    void newFor_newUser_hasZeroBalanceAndAssignedId() {
-        var wallet = Wallet.newFor("user-abc");
+    void create_newUser_hasZeroBalanceAndAssignedId() {
+        var wallet = Wallet.create("user-abc");
         assertThat(wallet.getBalance()).isEqualTo(0L);
         assertThat(wallet.getUserId()).isEqualTo("user-abc");
         assertThat(wallet.getId()).isNotNull();

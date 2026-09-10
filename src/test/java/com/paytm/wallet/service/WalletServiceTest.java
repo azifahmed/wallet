@@ -30,7 +30,7 @@ class WalletServiceTest {
 
     @Test
     void getOrCreate_whenUserHasNone_createsNewWallet() {
-        Wallet savedWallet = Wallet.newFor("user1");
+        Wallet savedWallet = Wallet.create("user1");
         when(walletInsertService.insertWallet("user1")).thenReturn(savedWallet);
 
         Wallet result = walletService.getOrCreate("user1");
@@ -43,7 +43,7 @@ class WalletServiceTest {
 
     @Test
     void getOrCreate_whenDuplicateKeyOnSave_returnsExistingWallet() {
-        Wallet existingWallet = Wallet.newFor("user1");
+        Wallet existingWallet = Wallet.create("user1");
         when(walletInsertService.insertWallet("user1"))
             .thenThrow(new DataIntegrityViolationException("duplicate key"));
         when(walletRepository.findByUserId("user1")).thenReturn(Optional.of(existingWallet));

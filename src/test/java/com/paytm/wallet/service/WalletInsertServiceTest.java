@@ -32,7 +32,7 @@ class WalletInsertServiceTest {
 
     @Test
     void insertWallet_whenInsertSucceeds_flushesBeforeIncrementingMetrics() {
-        Wallet savedWallet = Wallet.newFor("user1");
+        Wallet savedWallet = Wallet.create("user1");
         when(walletRepository.saveAndFlush(any(Wallet.class))).thenReturn(savedWallet);
 
         Wallet result = walletInsertService.insertWallet("user1");

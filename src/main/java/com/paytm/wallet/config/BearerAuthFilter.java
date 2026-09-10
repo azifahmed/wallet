@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -64,7 +65,12 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         }
 
         request.setAttribute("userId", userId);
-        filterChain.doFilter(request, response);
+        MDC.put("user_id", userId);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove("user_id");
+        }
     }
 
     private boolean allowUnauthenticated(HttpServletRequest request, HttpServletResponse response)

@@ -46,8 +46,8 @@ class TransferServiceTest {
 
     @Test
     void transfer_withSufficientFunds_completesAndReturnsTransfer() {
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.newFor("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.newFor("u2")));
+        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
+        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
         when(transferRepository.findByIdempotencyKey("key1")).thenReturn(Optional.empty());
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
         when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
@@ -66,8 +66,8 @@ class TransferServiceTest {
 
     @Test
     void transfer_whenConditionalDebitReturnsZero_throwsInsufficientFunds() {
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.newFor("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.newFor("u2")));
+        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
+        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
         when(transferRepository.findByIdempotencyKey("key2")).thenReturn(Optional.empty());
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(0);
 
@@ -107,8 +107,8 @@ class TransferServiceTest {
         when(transferRepository.findByIdempotencyKey("key5"))
             .thenReturn(Optional.empty())
             .thenReturn(Optional.of(committedTransfer));
-        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.newFor("u1")));
-        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.newFor("u2")));
+        when(walletRepository.findById(fromWalletId)).thenReturn(Optional.of(Wallet.create("u1")));
+        when(walletRepository.findById(toWalletId)).thenReturn(Optional.of(Wallet.create("u2")));
         when(walletRepository.conditionalDebit(fromWalletId, 5000L)).thenReturn(1);
         when(walletRepository.credit(toWalletId, 5000L)).thenReturn(1);
         when(transferRepository.saveAndFlush(any()))

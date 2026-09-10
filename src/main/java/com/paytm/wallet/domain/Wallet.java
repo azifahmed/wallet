@@ -29,7 +29,7 @@ public class Wallet {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public static Wallet newFor(String userId) {
+    public static Wallet create(String userId) {
         var wallet = new Wallet();
         wallet.id = UUID.randomUUID();
         wallet.userId = userId;

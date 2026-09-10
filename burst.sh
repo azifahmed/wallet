@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# Wallet Transfer — Burst Concurrency Test
+# Wallet Transfer — Burst Concurrency Test (client-side probe)
 # Usage: bash burst.sh <BASE_URL>
+#
+# This script is independent of where the API is hosted. Point it at
+# localhost after `docker compose up`, or at a public Render/Railway URL.
+# Deployment (Dockerfile / compose / host) is a separate concern.
 # ============================================================
 set -euo pipefail
 BASE_URL="${1:-http://localhost:8080}"
+# Strip trailing slash so paths join cleanly
+BASE_URL="${BASE_URL%/}"
 PASS=0; FAIL=0
 GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}[PASS]${NC} $1"; PASS=$((PASS+1)); }
@@ -19,8 +25,12 @@ echo "--- Bootstrap ---"
 W1=$(curl -sf -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user1" | jq -r '.walletId')
 W2=$(curl -sf -X POST "$BASE_URL/wallets" -H "Authorization: Bearer token-user2" | jq -r '.walletId')
 echo "W1=$W1  W2=$W2"
-echo "Fund wallets before TEST 2/3, e.g.:"
-echo "  docker compose exec postgres psql -U walletuser -d walletdb -c \"UPDATE wallets SET balance=1000000 WHERE id IN ('$W1','$W2');\""
+echo ""
+echo "Fund W1 and W2 to ~1000000 paise BEFORE running TEST 2/3 (one-time SQL):"
+echo "  Local:  docker compose exec postgres psql -U walletuser -d walletdb -c \\"
+echo "          \"UPDATE wallets SET balance=1000000 WHERE id IN ('$W1','$W2');\""
+echo "  Remote: use your host's Postgres shell (Render DB → Connect) with the same SQL,"
+echo "          then re-run: bash burst.sh $BASE_URL"
 
 echo ""
 echo "--- TEST 1: 50 concurrent POST /wallets for same user ---"
@@ -32,6 +42,22 @@ if [ "$WALLET_IDS" -eq 1 ]; then
 else
   fail "TEST 1: Got $WALLET_IDS distinct wallet IDs — expected 1"
 fi
+
+echo ""
+echo "--- Pre-check: funded balances for TEST 2/3 ---"
+FUND_W1=$(curl -sf "$BASE_URL/wallets/$W1" -H "Authorization: Bearer token-user1" | jq -r '.balance')
+FUND_W2=$(curl -sf "$BASE_URL/wallets/$W2" -H "Authorization: Bearer token-user2" | jq -r '.balance')
+echo "Current balances: W1=$FUND_W1  W2=$FUND_W2"
+MIN_FUND=50000
+if [ "${FUND_W1:-0}" -lt "$MIN_FUND" ] || [ "${FUND_W2:-0}" -lt "$MIN_FUND" ]; then
+  fail "Wallets underfunded for TEST 2/3 (need ≥ ${MIN_FUND} paise each). Apply the SQL above, then re-run."
+  echo ""
+  echo "==============================="
+  echo " Results: ${PASS} passed, ${FAIL} failed"
+  echo "==============================="
+  exit "$FAIL"
+fi
+ok "Wallets funded enough for contention probes"
 
 echo ""
 echo "--- TEST 2: 30 concurrent POSTs with same idempotency_key ---"
@@ -53,7 +79,12 @@ else
 fi
 
 echo ""
-echo "--- TEST 3: 50 A→B + 50 B→A concurrent transfers ---"
+echo "--- TEST 3: 50 A→B + 50 B→A — conservation + no negative ---"
+BEFORE_W1=$(curl -sf "$BASE_URL/wallets/$W1" -H "Authorization: Bearer token-user1" | jq -r '.balance')
+BEFORE_W2=$(curl -sf "$BASE_URL/wallets/$W2" -H "Authorization: Bearer token-user2" | jq -r '.balance')
+BEFORE_SUM=$((BEFORE_W1 + BEFORE_W2))
+echo "Before: W1=$BEFORE_W1  W2=$BEFORE_W2  sum=$BEFORE_SUM"
+
 SEQ="con-$(date +%s%N)"
 (seq 1 50 | xargs -P50 -I{} curl -sf -X POST "$BASE_URL/transfers" \
    -H "Authorization: Bearer token-user1" -H "Content-Type: application/json" \
@@ -64,13 +95,22 @@ SEQ="con-$(date +%s%N)"
    -d "{\"from\":\"$W2\",\"to\":\"$W1\",\"amount_paise\":100,\"idempotency_key\":\"${SEQ}-ba-{}\"}" \
    > /dev/null 2>&1 &
  wait)
+
 BAL_W1=$(curl -sf "$BASE_URL/wallets/$W1" -H "Authorization: Bearer token-user1" | jq -r '.balance')
 BAL_W2=$(curl -sf "$BASE_URL/wallets/$W2" -H "Authorization: Bearer token-user2" | jq -r '.balance')
-echo "W1 balance: $BAL_W1  |  W2 balance: $BAL_W2"
+AFTER_SUM=$((BAL_W1 + BAL_W2))
+echo "After:  W1=$BAL_W1  W2=$BAL_W2  sum=$AFTER_SUM"
+
 if [ "${BAL_W1:-0}" -ge 0 ] && [ "${BAL_W2:-0}" -ge 0 ]; then
-  ok "TEST 3: No negative balances after A↔B contention"
+  ok "TEST 3a: No negative balances after A↔B contention"
 else
-  fail "TEST 3: Negative balance detected"
+  fail "TEST 3a: Negative balance detected (W1=$BAL_W1 W2=$BAL_W2)"
+fi
+
+if [ "$AFTER_SUM" -eq "$BEFORE_SUM" ]; then
+  ok "TEST 3b: Conservation holds (sum unchanged: $BEFORE_SUM)"
+else
+  fail "TEST 3b: Conservation broken (before=$BEFORE_SUM after=$AFTER_SUM)"
 fi
 
 echo ""

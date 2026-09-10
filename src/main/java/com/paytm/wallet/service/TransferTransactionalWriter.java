@@ -48,8 +48,13 @@ public class TransferTransactionalWriter {
             metrics.incrementDeclined();
             throw new InsufficientFundsException(request.fromWalletId().toString());
         }
+        log.info("event=transfer_debited from_wallet={} amount_paise={}",
+            request.fromWalletId(), request.amountPaise());
 
         walletRepository.credit(request.toWalletId(), request.amountPaise());
+        log.info("event=transfer_credited to_wallet={} amount_paise={}",
+            request.toWalletId(), request.amountPaise());
+
         Transfer savedTransfer = transferRepository.saveAndFlush(
             Transfer.completed(
                 request.fromWalletId(),
