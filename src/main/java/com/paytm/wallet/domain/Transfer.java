@@ -2,6 +2,9 @@ package com.paytm.wallet.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -31,7 +34,8 @@ public class Transfer {
     private String idempotencyKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "transfer_status", nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false)
     private Status status;
 
     @Column(name = "decline_reason", length = 100)
