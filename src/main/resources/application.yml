@@ -50,3 +50,8 @@ app:
       user3: "token-user3"
       user4: "token-user4"
       user5: "token-user5"
+  rate-limit:
+    enabled: true
+    authenticated-limit: 300
+    unauthenticated-limit: 30
+    window-seconds: 60
